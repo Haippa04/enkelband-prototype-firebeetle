@@ -103,5 +103,5 @@ void loop() {
 
   publishMqttMessages(tempC);
 
-  delay(5000);
+  delay(6000);
 }
