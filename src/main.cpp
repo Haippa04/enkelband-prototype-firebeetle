@@ -14,6 +14,10 @@ DallasTemperature sensors(&oneWire);
 #define MQTT_PUB_TEMPERATURE "esp/sensor/temperature"
 #define MQTT_PUB_WARNING "esp/sensor/warning"
 
+// Define the Last Will and Testament (LWT) topic and message
+#define MQTT_LWT_TOPIC "esp/sensor/status"
+#define MQTT_LWT_MESSAGE "ESP32 Disconnected"
+
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
@@ -45,6 +49,8 @@ void connectToMqtt() {
 // Handle successful MQTT connection
 void onMqttConnect(bool sessionPresent) {
   Serial.println("Connected to MQTT.");
+  // Clear the LWT message once the ESP32 is connected
+  mqttClient.publish(MQTT_LWT_TOPIC, 1, true, "ESP32 Connected");
 }
 
 // Handle MQTT disconnection
@@ -57,7 +63,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
 
 // Publish MQTT messages
 void publishMqttMessages(float temperature) {
-  String tempStr = String(temperature, 2); // Omzetten naar string met 2 decimalen
+  String tempStr = String(temperature, 2); // Convert to string with 2 decimals
   uint16_t packetIdTemp = mqttClient.publish(MQTT_PUB_TEMPERATURE, 1, true, tempStr.c_str());
   Serial.printf("Publishing on topic %s, packetId: %i, Message: %s\n", MQTT_PUB_TEMPERATURE, packetIdTemp, tempStr.c_str());
   
@@ -81,9 +87,12 @@ void setup() {
   Serial.begin(115200);
   sensors.begin();
   
-  // Start WiFi en MQTT timers
+  // Start WiFi and MQTT timers
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
   wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(initWifi));
+
+  // Set the LWT (Last Will and Testament) message
+  mqttClient.setWill(MQTT_LWT_TOPIC, 1, true, MQTT_LWT_MESSAGE);
 
   mqttClient.onConnect(onMqttConnect);
   mqttClient.onDisconnect(onMqttDisconnect);
